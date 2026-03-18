@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="12" fill="#282838"/>
+  <circle cx="32" cy="28" r="16" fill="none" stroke="#89b4fa" stroke-width="2.5"/>
+  <circle cx="32" cy="28" r="8" fill="none" stroke="#89b4fa" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <path d="M16 44 L24 38 L32 42 L40 36 L48 40" fill="none" stroke="#f9e2af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="58" text-anchor="middle" font-family="sans-serif" font-size="7" font-weight="700" fill="#cdd6f4">QCM</text>
+</svg>

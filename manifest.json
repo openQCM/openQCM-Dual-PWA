@@ -2,7 +2,7 @@
   "name": "openQCM Dual",
   "short_name": "openQCM",
   "description": "Dual Quartz Sensors monitoring — Progressive Web App",
-  "start_url": "/index.html",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#1e1e2e",
   "theme_color": "#1e1e2e",

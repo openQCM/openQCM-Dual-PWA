@@ -1,18 +1,19 @@
 /** Service worker — cache-first for static assets. */
 
 const CACHE_NAME = 'openqcm-v1';
+// Use relative paths so the SW works both at root and in subdirectories (GitHub Pages)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/config.js',
-  '/js/data-model.js',
-  '/js/serial-comm.js',
-  '/js/csv-export.js',
-  '/js/charts.js',
-  '/js/app.js',
-  '/manifest.json',
-  '/icons/openqcm.svg',
+  './',
+  './index.html',
+  './css/style.css',
+  './js/config.js',
+  './js/data-model.js',
+  './js/serial-comm.js',
+  './js/csv-export.js',
+  './js/charts.js',
+  './js/app.js',
+  './manifest.json',
+  './icons/openqcm.svg',
 ];
 
 // Pre-cache static assets on install

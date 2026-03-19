@@ -31,7 +31,8 @@ const CONFIG = {
 
 const QCM_IDS = ['chart-freq1', 'chart-freq2', 'chart-diff'];
 const QCM_LABELS = ['Frequency #1 (Hz)', 'Frequency #2 (Hz)', 'ΔF (Hz)'];
-let _syncing = false; // guard against recursive relayout events
+let _syncing = false;    // guard against recursive relayout events
+let _interacting = false; // true while user is dragging/zooming on a chart
 
 export function initQCMCharts() {
   QCM_IDS.forEach((id, i) => {
@@ -71,15 +72,23 @@ export function initQCMCharts() {
 
     Plotly.newPlot(div, traces, layout, CONFIG);
 
-    // Sync x-axis zoom/pan across all 3 QCM charts
+    // Track user drag interactions — pause data updates while dragging
+    const plotArea = div.querySelector('.nsewdrag') || div;
+    plotArea.addEventListener('mousedown', () => { _interacting = true; });
+    document.addEventListener('mouseup', () => {
+      if (_interacting) {
+        _interacting = false;
+      }
+    });
+
+    // Sync x-axis zoom/pan across all 3 QCM charts (user-initiated only)
     div.on('plotly_relayout', (update) => {
       if (_syncing) return;
+      // Only sync explicit x-axis range changes (from user zoom/pan)
+      if (update['xaxis.range[0]'] === undefined && update['xaxis.autorange'] === undefined) return;
       const xRange = update['xaxis.range[0]'] !== undefined
         ? { 'xaxis.range[0]': update['xaxis.range[0]'], 'xaxis.range[1]': update['xaxis.range[1]'] }
-        : update['xaxis.autorange'] !== undefined
-          ? { 'xaxis.autorange': true }
-          : null;
-      if (!xRange) return;
+        : { 'xaxis.autorange': true };
       _syncing = true;
       QCM_IDS.forEach(otherId => {
         if (otherId !== id) {
@@ -94,9 +103,14 @@ export function initQCMCharts() {
 let _revision = 0;
 
 export function updateQCMCharts(time, raw, avg) {
+  // Skip chart updates while user is dragging to zoom/pan
+  if (_interacting) return;
+
   const keys = ['freq1', 'freq2', 'diff'];
   _revision++;
 
+  // Suppress relayout sync during programmatic updates
+  _syncing = true;
   QCM_IDS.forEach((id, i) => {
     const div = document.getElementById(id);
     const key = keys[i];
@@ -136,6 +150,7 @@ export function updateQCMCharts(time, raw, avg) {
     };
     Plotly.react(div, traces, layout, CONFIG);
   });
+  _syncing = false;
 }
 
 export function setRawVisible(visible) {

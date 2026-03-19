@@ -6,8 +6,8 @@ import { SerialComm, isWebSerialSupported, getGrantedPorts } from './serial-comm
 import { CSVExporter } from './csv-export.js';
 import {
   initQCMCharts, initTECChart,
-  updateQCMCharts, setRawVisible, autoscaleQCM, clearQCM,
-  updateTECTemp, updateOnboardTemp, autoscaleTEC, clearTEC,
+  updateQCMCharts, setRawVisible, clearQCM,
+  updateTECTemp, updateOnboardTemp, clearTEC,
   resizeCharts, installContextMenu,
 } from './charts.js';
 
@@ -24,7 +24,6 @@ const $ = (id) => document.getElementById(id);
 const portSelect    = $('port-select');
 const refreshBtn    = $('refresh-btn');
 const connectBtn    = $('connect-btn');
-const autoscaleBtn  = $('autoscale-btn');
 const clearBtn      = $('clear-btn');
 const rawBtn        = $('raw-btn');
 const saveBtn       = $('save-btn');
@@ -59,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Wire buttons
   refreshBtn.addEventListener('click', refreshPorts);
   connectBtn.addEventListener('click', toggleConnect);
-  autoscaleBtn.addEventListener('click', () => { autoscaleQCM(); autoscaleTEC(); });
   clearBtn.addEventListener('click', clearAll);
   rawBtn.addEventListener('click', toggleRaw);
   saveBtn.addEventListener('click', toggleSave);

@@ -1,4 +1,4 @@
-/** Plotly.js chart setup and update — replaces pyqtgraph PlotWidget logic. */
+/** Plotly.js chart setup and update — basic streaming configuration. */
 
 import { COLORS } from './config.js';
 
@@ -18,27 +18,25 @@ const LAYOUT_BASE = {
   font: { color: COLORS.TEXT_DIM, family: '"SF Pro Text","Segoe UI","Roboto",sans-serif', size: 11 },
   margin: { l: 60, r: 16, t: 8, b: 32 },
   showlegend: false,
-  datarevision: 0,
 };
 
 const CONFIG = {
   responsive: true,
-  displayModeBar: false,
-  scrollZoom: true,
+  displayModeBar: true,
+  scrollZoom: false,
 };
 
-/* ─── QCM: 3 subplots sharing x-axis ─── */
+/* ─── QCM: 3 independent charts ─── */
 
 const QCM_IDS = ['chart-freq1', 'chart-freq2', 'chart-diff'];
 const QCM_LABELS = ['Frequency #1 (Hz)', 'Frequency #2 (Hz)', 'ΔF (Hz)'];
-let _syncing = false;    // guard against recursive relayout events
-let _interacting = false; // true while user is dragging/zooming on a chart
+
+let _lastIndex = 0;
 
 export function initQCMCharts() {
   QCM_IDS.forEach((id, i) => {
     const div = document.getElementById(id);
     const traces = [
-      // Trace 0: raw scatter (hidden by default)
       {
         x: [], y: [],
         mode: 'markers',
@@ -47,7 +45,6 @@ export function initQCMCharts() {
         name: 'Raw',
         hoverinfo: 'skip',
       },
-      // Trace 1: averaged line
       {
         x: [], y: [],
         mode: 'lines',
@@ -71,86 +68,26 @@ export function initQCMCharts() {
     };
 
     Plotly.newPlot(div, traces, layout, CONFIG);
-
-    // Track user drag interactions — pause data updates while dragging
-    const plotArea = div.querySelector('.nsewdrag') || div;
-    plotArea.addEventListener('mousedown', () => { _interacting = true; });
-    document.addEventListener('mouseup', () => {
-      if (_interacting) {
-        _interacting = false;
-      }
-    });
-
-    // Sync x-axis zoom/pan across all 3 QCM charts (user-initiated only)
-    div.on('plotly_relayout', (update) => {
-      if (_syncing) return;
-      // Only sync explicit x-axis range changes (from user zoom/pan)
-      if (update['xaxis.range[0]'] === undefined && update['xaxis.autorange'] === undefined) return;
-      const xRange = update['xaxis.range[0]'] !== undefined
-        ? { 'xaxis.range[0]': update['xaxis.range[0]'], 'xaxis.range[1]': update['xaxis.range[1]'] }
-        : { 'xaxis.autorange': true };
-      _syncing = true;
-      QCM_IDS.forEach(otherId => {
-        if (otherId !== id) {
-          Plotly.relayout(document.getElementById(otherId), xRange);
-        }
-      });
-      _syncing = false;
-    });
   });
 }
 
-let _revision = 0;
-
 export function updateQCMCharts(time, raw, avg) {
-  // Skip chart updates while user is dragging to zoom/pan
-  if (_interacting) return;
+  const newCount = time.length - _lastIndex;
+  if (newCount <= 0) return;
 
   const keys = ['freq1', 'freq2', 'diff'];
-  _revision++;
+  const newTime = time.slice(_lastIndex);
 
-  // Suppress relayout sync during programmatic updates
-  _syncing = true;
   QCM_IDS.forEach((id, i) => {
     const div = document.getElementById(id);
     const key = keys[i];
-    const traces = [
-      {
-        x: time, y: raw[key],
-        mode: 'markers',
-        marker: { color: COLORS.YELLOW, size: 3 },
-        visible: div.data?.[0]?.visible ?? false,
-        name: 'Raw',
-        hoverinfo: 'skip',
-      },
-      {
-        x: time, y: avg[key],
-        mode: 'lines',
-        line: { color: COLORS.ACCENT, width: 2 },
-        name: 'Avg',
-      },
-    ];
-    // Preserve current x-axis range if user has zoomed
-    const curXRange = div.layout?.xaxis?.range;
-    const curAutorange = div.layout?.xaxis?.autorange;
-    const layout = {
-      ...LAYOUT_BASE,
-      datarevision: _revision,
-      xaxis: {
-        ...AXIS_STYLE,
-        title: i === 2 ? { text: 'Time (s)', font: { size: 11, color: COLORS.TEXT_DIM } } : undefined,
-        ...(curXRange && !curAutorange ? { range: curXRange, autorange: false } : {}),
-      },
-      yaxis: {
-        ...AXIS_STYLE,
-        title: { text: QCM_LABELS[i], font: { size: 11, color: COLORS.TEXT_DIM } },
-        tickformat: 'd',
-        exponentformat: 'none',
-      },
-    };
-    Plotly.react(div, traces, layout, CONFIG);
+    Plotly.extendTraces(div, {
+      x: [newTime, newTime],
+      y: [raw[key].slice(_lastIndex), avg[key].slice(_lastIndex)],
+    }, [0, 1]);
   });
-  _syncing = false;
+
+  _lastIndex = time.length;
 }
 
 export function setRawVisible(visible) {
@@ -160,22 +97,16 @@ export function setRawVisible(visible) {
 }
 
 export function autoscaleQCM() {
-  _syncing = true;
-  QCM_IDS.forEach(id => {
-    Plotly.relayout(document.getElementById(id), {
-      'xaxis.autorange': true,
-      'yaxis.autorange': true,
-    });
-  });
-  _syncing = false;
+  // Plotly modebar has its own autoscale button
 }
 
 export function clearQCM() {
+  _lastIndex = 0;
   QCM_IDS.forEach(id => {
     const div = document.getElementById(id);
     div.data[0].x = []; div.data[0].y = [];
     div.data[1].x = []; div.data[1].y = [];
-    Plotly.react(div, div.data, div.layout);
+    Plotly.redraw(div);
   });
 }
 
@@ -216,46 +147,25 @@ export function initTECChart() {
   Plotly.newPlot(div, traces, layout, CONFIG);
 }
 
-// TEC data arrays (managed here since they have their own time axis)
-let tecTime = [];
-let tecData = [];
-let onboardTime = [];
-let onboardData = [];
-
 export function updateTECTemp(time, temp) {
-  tecTime.push(time);
-  tecData.push(temp);
   const div = document.getElementById('chart-temp');
-  div.data[0].x = tecTime;
-  div.data[0].y = tecData;
-  div.layout.datarevision = ++_revision;
-  Plotly.react(div, div.data, div.layout);
+  Plotly.extendTraces(div, { x: [[time]], y: [[temp]] }, [0]);
 }
 
 export function updateOnboardTemp(time, temp) {
-  onboardTime.push(time);
-  onboardData.push(temp);
   const div = document.getElementById('chart-temp');
-  div.data[1].x = onboardTime;
-  div.data[1].y = onboardData;
-  div.layout.datarevision = ++_revision;
-  Plotly.react(div, div.data, div.layout);
+  Plotly.extendTraces(div, { x: [[time]], y: [[temp]] }, [1]);
 }
 
 export function autoscaleTEC() {
-  Plotly.relayout(document.getElementById('chart-temp'), {
-    'xaxis.autorange': true,
-    'yaxis.autorange': true,
-  });
+  // Plotly modebar has its own autoscale button
 }
 
 export function clearTEC() {
-  tecTime = []; tecData = [];
-  onboardTime = []; onboardData = [];
   const div = document.getElementById('chart-temp');
   div.data[0].x = []; div.data[0].y = [];
   div.data[1].x = []; div.data[1].y = [];
-  Plotly.react(div, div.data, div.layout);
+  Plotly.redraw(div);
 }
 
 /* ─── Resize visible charts (needed after tab switch) ─── */
@@ -268,48 +178,8 @@ export function resizeCharts(tab) {
   }
 }
 
-/* ─── Custom context menu ─── */
+/* ─── No custom context menu — using Plotly's native modebar ─── */
 
 export function installContextMenu() {
-  const allChartIds = ['chart-freq1', 'chart-freq2', 'chart-diff', 'chart-temp'];
-  const menu = document.createElement('div');
-  menu.className = 'context-menu';
-  menu.style.display = 'none';
-  menu.innerHTML = `
-    <div class="context-menu-item" data-action="autoscale">Auto-scale</div>
-    <div class="context-menu-item" data-action="reset">Reset Zoom</div>
-    <div class="context-menu-sep"></div>
-    <div class="context-menu-item" data-action="pan">Pan Mode</div>
-    <div class="context-menu-item" data-action="select">Select Mode</div>
-  `;
-  document.body.appendChild(menu);
-
-  let targetDiv = null;
-
-  allChartIds.forEach(id => {
-    const div = document.getElementById(id);
-    if (!div) return;
-    div.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      targetDiv = div;
-      menu.style.left = e.clientX + 'px';
-      menu.style.top = e.clientY + 'px';
-      menu.style.display = 'block';
-    });
-  });
-
-  document.addEventListener('click', () => { menu.style.display = 'none'; });
-
-  menu.addEventListener('click', (e) => {
-    const action = e.target.dataset.action;
-    if (!action || !targetDiv) return;
-    if (action === 'autoscale' || action === 'reset') {
-      Plotly.relayout(targetDiv, { 'xaxis.autorange': true, 'yaxis.autorange': true });
-    } else if (action === 'pan') {
-      Plotly.relayout(targetDiv, { dragmode: 'pan' });
-    } else if (action === 'select') {
-      Plotly.relayout(targetDiv, { dragmode: 'select' });
-    }
-    menu.style.display = 'none';
-  });
+  // Disabled — Plotly's built-in modebar handles zoom/pan/autoscale
 }

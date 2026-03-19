@@ -6,7 +6,7 @@ Progressive Web App for **openQCM Dual** — real-time monitoring of dual quartz
 
 ## Features
 
-- **Real-time frequency monitoring** — 3 synchronized charts (Frequency #1, Frequency #2, ΔF) with linked X-axis zoom/pan
+- **Real-time frequency monitoring** — 3 charts (Frequency #1, Frequency #2, ΔF) with Plotly interactive toolbar (zoom, pan, autoscale, reset, download PNG)
 - **Temperature monitoring** — TEC and onboard temperature on dedicated tab
 - **Web Serial API** — direct USB connection to Teensy 4.0 from the browser (Chrome/Edge)
 - **Real-time CSV export** — data written to disk sample-by-sample via File System Access API

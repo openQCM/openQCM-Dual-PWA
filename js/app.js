@@ -266,19 +266,25 @@ function toggleRaw() {
   setRawVisible(rawVisible);
 }
 
-function toggleSave() {
+async function toggleSave() {
   if (csvExporter.isActive) {
-    // Stop logging and download
-    csvExporter.stop();
-    csvExporter.download();
+    // Stop logging and close file
+    const count = csvExporter.rowCount;
+    await csvExporter.stop();
     saveBtn.textContent = 'Save Data';
     saveBtn.dataset.logging = 'false';
-    setStatus(serial?.connected ? 'Connected' : 'Disconnected');
+    if (count > 0) {
+      setStatus(`Saved ${count} samples`);
+    } else {
+      setStatus('No data to save');
+    }
+    setTimeout(() => setStatus(serial?.connected ? 'Connected' : 'Disconnected'), 2000);
     lastDataLabel.textContent = '';
   } else {
-    // Start logging
-    csvExporter.start();
-    saveBtn.textContent = 'Stop Data';
+    // Start logging (shows file picker dialog)
+    const started = await csvExporter.start();
+    if (!started) return; // user cancelled dialog
+    saveBtn.textContent = 'Stop & Save';
     saveBtn.dataset.logging = 'true';
     setStatus('Logging...');
   }

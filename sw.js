@@ -1,6 +1,6 @@
 /** Service worker — cache-first for static assets. */
 
-const CACHE_NAME = 'openqcm-v1';
+const CACHE_NAME = 'openqcm-v2';
 // Use relative paths so the SW works both at root and in subdirectories (GitHub Pages)
 const STATIC_ASSETS = [
   './',

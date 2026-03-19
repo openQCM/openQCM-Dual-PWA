@@ -29,15 +29,12 @@ const CONFIG = {
 
 /* ─── QCM: 3 subplots sharing x-axis ─── */
 
-let qcmDiv = null;
+const QCM_IDS = ['chart-freq1', 'chart-freq2', 'chart-diff'];
+const QCM_LABELS = ['Frequency #1 (Hz)', 'Frequency #2 (Hz)', 'ΔF (Hz)'];
+let _syncing = false; // guard against recursive relayout events
 
 export function initQCMCharts() {
-  qcmDiv = document.getElementById('chart-freq1');
-  // We use 3 separate divs for simpler layout, but link x-axes manually.
-  const ids = ['chart-freq1', 'chart-freq2', 'chart-diff'];
-  const labels = ['Frequency #1 (Hz)', 'Frequency #2 (Hz)', 'ΔF (Hz)'];
-
-  ids.forEach((id, i) => {
+  QCM_IDS.forEach((id, i) => {
     const div = document.getElementById(id);
     const traces = [
       // Trace 0: raw scatter (hidden by default)
@@ -66,13 +63,31 @@ export function initQCMCharts() {
       },
       yaxis: {
         ...AXIS_STYLE,
-        title: { text: labels[i], font: { size: 11, color: COLORS.TEXT_DIM } },
+        title: { text: QCM_LABELS[i], font: { size: 11, color: COLORS.TEXT_DIM } },
         tickformat: 'd',
         exponentformat: 'none',
       },
     };
 
     Plotly.newPlot(div, traces, layout, CONFIG);
+
+    // Sync x-axis zoom/pan across all 3 QCM charts
+    div.on('plotly_relayout', (update) => {
+      if (_syncing) return;
+      const xRange = update['xaxis.range[0]'] !== undefined
+        ? { 'xaxis.range[0]': update['xaxis.range[0]'], 'xaxis.range[1]': update['xaxis.range[1]'] }
+        : update['xaxis.autorange'] !== undefined
+          ? { 'xaxis.autorange': true }
+          : null;
+      if (!xRange) return;
+      _syncing = true;
+      QCM_IDS.forEach(otherId => {
+        if (otherId !== id) {
+          Plotly.relayout(document.getElementById(otherId), xRange);
+        }
+      });
+      _syncing = false;
+    });
   });
 }
 
@@ -80,11 +95,9 @@ let _revision = 0;
 
 export function updateQCMCharts(time, raw, avg) {
   const keys = ['freq1', 'freq2', 'diff'];
-  const ids = ['chart-freq1', 'chart-freq2', 'chart-diff'];
-  const labels = ['Frequency #1 (Hz)', 'Frequency #2 (Hz)', 'ΔF (Hz)'];
   _revision++;
 
-  ids.forEach((id, i) => {
+  QCM_IDS.forEach((id, i) => {
     const div = document.getElementById(id);
     const key = keys[i];
     const traces = [
@@ -103,16 +116,20 @@ export function updateQCMCharts(time, raw, avg) {
         name: 'Avg',
       },
     ];
+    // Preserve current x-axis range if user has zoomed
+    const curXRange = div.layout?.xaxis?.range;
+    const curAutorange = div.layout?.xaxis?.autorange;
     const layout = {
       ...LAYOUT_BASE,
       datarevision: _revision,
       xaxis: {
         ...AXIS_STYLE,
         title: i === 2 ? { text: 'Time (s)', font: { size: 11, color: COLORS.TEXT_DIM } } : undefined,
+        ...(curXRange && !curAutorange ? { range: curXRange, autorange: false } : {}),
       },
       yaxis: {
         ...AXIS_STYLE,
-        title: { text: labels[i], font: { size: 11, color: COLORS.TEXT_DIM } },
+        title: { text: QCM_LABELS[i], font: { size: 11, color: COLORS.TEXT_DIM } },
         tickformat: 'd',
         exponentformat: 'none',
       },
@@ -122,25 +139,24 @@ export function updateQCMCharts(time, raw, avg) {
 }
 
 export function setRawVisible(visible) {
-  const ids = ['chart-freq1', 'chart-freq2', 'chart-diff'];
-  ids.forEach(id => {
+  QCM_IDS.forEach(id => {
     Plotly.restyle(document.getElementById(id), { visible: visible }, [0]);
   });
 }
 
 export function autoscaleQCM() {
-  const ids = ['chart-freq1', 'chart-freq2', 'chart-diff'];
-  ids.forEach(id => {
+  _syncing = true;
+  QCM_IDS.forEach(id => {
     Plotly.relayout(document.getElementById(id), {
       'xaxis.autorange': true,
       'yaxis.autorange': true,
     });
   });
+  _syncing = false;
 }
 
 export function clearQCM() {
-  const ids = ['chart-freq1', 'chart-freq2', 'chart-diff'];
-  ids.forEach(id => {
+  QCM_IDS.forEach(id => {
     const div = document.getElementById(id);
     div.data[0].x = []; div.data[0].y = [];
     div.data[1].x = []; div.data[1].y = [];
@@ -231,9 +247,7 @@ export function clearTEC() {
 
 export function resizeCharts(tab) {
   if (tab === 'qcm') {
-    ['chart-freq1', 'chart-freq2', 'chart-diff'].forEach(id =>
-      Plotly.Plots.resize(document.getElementById(id))
-    );
+    QCM_IDS.forEach(id => Plotly.Plots.resize(document.getElementById(id)));
   } else {
     Plotly.Plots.resize(document.getElementById('chart-temp'));
   }
